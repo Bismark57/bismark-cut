@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bismark Cut — Simple Video Editor</title>
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "@ffmpeg/ffmpeg": "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/index.js",
+    "@ffmpeg/util": "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js"
+  }
+}
+</script>
+</head>
+<body>
+<header class="topbar">
+  <div class="logo">✂️ Bismark Cut</div>
+  <div class="top-actions">
+    <button id="btn-new" class="btn ghost">New project</button>
+    <button id="btn-export" class="btn primary">Export MP4</button>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- MEDIA BIN -->
+  <section class="panel" id="media-panel">
+    <h2>📁 Media</h2>
+    <button id="btn-add-media" class="btn wide">+ Add videos / photos</button>
+    <input type="file" id="file-media" accept="video/*,image/*" multiple hidden>
+    <div id="media-bin" class="media-bin"></div>
+    <p class="hint">Add files, then tap <b>+ Timeline</b> on a thumbnail to add it to your video.</p>
+  </section>
+
+  <!-- PREVIEW -->
+  <section class="panel" id="preview-panel">
+    <div class="settings-row">
+      <label>Shape
+        <select id="sel-aspect">
+          <option value="9:16" selected>9:16 vertical (Shorts)</option>
+          <option value="16:9">16:9 widescreen</option>
+          <option value="1:1">1:1 square</option>
+        </select>
+      </label>
+      <label>Quality
+        <select id="sel-res">
+          <option value="720p" selected>720p</option>
+          <option value="1080p">1080p</option>
+        </select>
+      </label>
+    </div>
+    <div id="stage-wrap">
+      <div id="stage">
+        <video id="preview-video" playsinline preload="auto"></video>
+        <img id="preview-img" alt="" hidden>
+        <div id="overlay-layer"></div>
+      </div>
+    </div>
+    <div class="transport">
+      <button id="btn-play" class="btn big" aria-label="Play or pause">▶</button>
+      <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="Seek">
+      <span id="time-display">0:00 / 0:00</span>
+    </div>
+  </section>
+
+  <!-- TIMELINE -->
+  <section class="panel" id="timeline-panel">
+    <h2>🎞️ Timeline</h2>
+    <div class="tl-toolbar">
+      <button id="btn-split" class="btn">✂️ Split at playhead</button>
+      <button id="btn-move-left" class="btn" title="Move clip left">◀</button>
+      <button id="btn-move-right" class="btn" title="Move clip right">▶</button>
+      <button id="btn-del-clip" class="btn danger">🗑 Delete</button>
+    </div>
+    <div id="tl-scroll">
+      <div id="tl-inner">
+        <div id="tl-ruler"></div>
+        <div id="tl-track"></div>
+        <div id="tl-playhead" hidden></div>
+      </div>
+    </div>
+    <p class="hint">Drag a block to reorder · drag its edges to trim · tap to select.</p>
+  </section>
+
+  <!-- INSPECTOR -->
+  <section class="panel" id="inspector">
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="clip">Clip</button>
+      <button class="tab" data-tab="text">Text</button>
+      <button class="tab" data-tab="audio">Audio</button>
+    </div>
+
+    <div id="tab-clip" class="tabpage">
+      <div id="clip-empty" class="empty-note">Tap a timeline block to edit its trim.</div>
+      <div id="clip-editor" hidden>
+        <p class="clip-name" id="clip-name"></p>
+        <label>Trim start <span id="ts-val"></span>
+          <input type="range" id="trim-start" min="0" max="100" step="0.05" value="0">
+        </label>
+        <label>Trim end <span id="te-val"></span>
+          <input type="range" id="trim-end" min="0" max="100" step="0.05" value="0">
+        </label>
+        <label id="img-dur-row" hidden>Photo length (sec)
+          <input type="number" id="img-dur" min="0.5" max="30" step="0.5" value="3">
+        </label>
+        <p class="hint">Clip plays <b id="clip-len"></b> in the final video.</p>
+      </div>
+    </div>
+
+    <div id="tab-text" class="tabpage" hidden>
+      <button id="btn-add-text" class="btn wide">+ Add caption</button>
+      <div id="overlay-list"></div>
+      <div id="text-editor" class="card" hidden>
+        <label>Text
+          <textarea id="ov-text" rows="2" placeholder="watch me be cool"></textarea>
+        </label>
+        <div class="row2">
+          <label>Starts (sec)<input type="number" id="ov-start" min="0" step="0.1" value="0"></label>
+          <label>Ends (sec)<input type="number" id="ov-end" min="0" step="0.1" value="2"></label>
+        </div>
+        <label>Position</label>
+        <div class="pos-row">
+          <button class="btn pos-btn" data-pos="top">Top</button>
+          <button class="btn pos-btn" data-pos="center">Center</button>
+          <button class="btn pos-btn" data-pos="bottom">Bottom</button>
+        </div>
+        <p class="hint">Or drag the caption on the preview to place it anywhere.</p>
+        <div class="row2">
+          <label>Size<input type="range" id="ov-size" min="20" max="120" value="56"></label>
+          <label>Color<input type="color" id="ov-color" value="#ffffff"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="ov-bg"> Dark box behind text</label>
+        <div class="row2">
+          <button id="ov-done" class="btn primary">Done</button>
+          <button id="ov-delete" class="btn danger">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-audio" class="tabpage" hidden>
+      <button id="btn-add-music" class="btn wide">+ Add background music</button>
+      <input type="file" id="file-music" accept="audio/*" hidden>
+      <div id="music-info" class="card" hidden>
+        <p class="clip-name" id="music-name"></p>
+        <label>Music volume
+          <input type="range" id="music-vol" min="0" max="1" step="0.05" value="0.5">
+        </label>
+        <label class="check"><input type="checkbox" id="mute-orig"> Mute original clip sound</label>
+        <button id="btn-del-music" class="btn danger">Remove music</button>
+      </div>
+      <p class="hint">Music plays under your whole video. Original clip sound stays unless muted.</p>
+    </div>
+  </section>
+</main>
+
+<!-- EXPORT MODAL -->
+<div id="export-modal" class="modal" hidden>
+  <div class="modal-card">
+    <h2 id="exp-title">Exporting video…</h2>
+    <div class="progress"><div id="exp-bar"></div></div>
+    <p id="exp-status">Getting ready…</p>
+    <pre id="exp-log"></pre>
+    <a id="exp-download" class="btn primary wide" hidden>⬇ Download MP4</a>
+    <button id="exp-close" class="btn ghost wide">Close</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script src="export.js"></script>
+</body>
+</html>
